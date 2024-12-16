@@ -17,6 +17,23 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
+const verifyToken = (req, res, next) => {
+    // console.log('request in custom middleware',req);
+    const token = req.cookies?.token;
+    if (!token) {
+        return res.status(401).send({ message: 'Unauthorized access' })
+    }
+    else {
+        jwt.verify(token, process.env.JWT_ACCESS_TOKEN, (err, decoded) => {
+            if (err) {
+                return res.status(401).send({ message: 'Unauthorized access' })
+            }
+            req.user = decoded
+            next();
+        })
+    }
+}
+
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster3.ggy8e.mongodb.net/?retryWrites=true&w=majority&appName=Cluster3`;
 
@@ -55,7 +72,7 @@ async function run() {
         })
 
         app.post('/logout', (req, res) => {
-            res.clearCookie('token',{
+            res.clearCookie('token', {
                 httpOnly: true,
                 secure: false
             })
@@ -90,9 +107,14 @@ async function run() {
 
         // job application apis
         // get all data, get one data, get some data [o, 1, many]
-        app.get('/job-application', async (req, res) => {
+        app.get('/job-application', verifyToken, async (req, res) => {
             const email = req.query.email;
             const query = { applicant_email: email }
+
+            if(req?.user?.email !== email){
+                return res.status(403).send({ message: 'Forbidden access' })
+            }
+
             const result = await jobApplicationCollection.find(query).toArray();
 
             // fokira way to aggregate data
@@ -122,6 +144,8 @@ async function run() {
 
         app.post('/job-applications', async (req, res) => {
             const application = req.body;
+
+
             const result = await jobApplicationCollection.insertOne(application);
 
             // Not the best way (use aggregate) 
