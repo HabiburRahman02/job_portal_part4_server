@@ -1,13 +1,21 @@
 const express = require('express');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
 const app = express();
 require('dotenv').config()
 
 const port = process.env.PORT || 5000;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
-app.use(cors());
+app.use(cors({
+    origin: [
+        'http://localhost:5173'
+    ],
+    credentials: true
+}));
 app.use(express.json());
+app.use(cookieParser());
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster3.ggy8e.mongodb.net/?retryWrites=true&w=majority&appName=Cluster3`;
@@ -33,6 +41,26 @@ async function run() {
         // jobs related apis
         const jobsCollection = client.db('jobPortal').collection('jobs');
         const jobApplicationCollection = client.db('jobPortal').collection('job_applications');
+
+
+        // auth related apis
+        app.post('/jwt', (req, res) => {
+            const user = req.body;
+            const token = jwt.sign(user, process.env.JWT_ACCESS_TOKEN, { expiresIn: '2h' })
+            res.cookie('token', token, {
+                httpOnly: true,
+                secure: false
+            })
+            res.send({ message: 'save token' })
+        })
+
+        app.post('/logout', (req, res) => {
+            res.clearCookie('token',{
+                httpOnly: true,
+                secure: false
+            })
+            res.send({ message: 'logout success' })
+        })
 
         // jobs related APIs
         app.get('/jobs', async (req, res) => {
